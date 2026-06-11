@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Player</title>
+
+    <!-- HLS.js for m3u8 support -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #e94560;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            color: #e94560;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            max-width: 1400px;
+            margin: 0 auto;
+            min-height: calc(100vh - 100px);
+        }
+
+        @media (min-width: 992px) {
+            .container {
+                flex-direction: row;
+            }
+        }
+
+        .player-section {
+            flex: 1;
+            padding: 20px;
+            min-width: 0;
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .video-wrapper video,
+        .video-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .video-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #555;
+        }
+
+        .video-placeholder svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            fill: #333;
+        }
+
+        .now-playing {
+            margin-top: 15px;
+            padding: 15px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            border-left: 4px solid #e94560;
+        }
+
+        .now-playing h3 {
+            color: #e94560;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .now-playing p {
+            color: #ddd;
+            font-size: 1rem;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: #e94560;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #c73652;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            border: 1px solid #333;
+        }
+
+        .btn-secondary:hover {
+            background: #16213e;
+            border-color: #e94560;
+        }
+
+        .playlist-section {
+            width: 100%;
+            background: #111;
+            border-left: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (min-width: 992px) {
+            .playlist-section {
+                width: 400px;
+                max-height: calc(100vh - 100px);
+            }
+        }
+
+        .playlist-header {
+            padding: 15px 20px;
+            background: #1a1a2e;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .playlist-header h2 {
+            font-size: 1rem;
+            color: #e94560;
+        }
+
+        .playlist-count {
+            background: #e94560;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .search-box {
+            padding: 10px 20px;
+            border-bottom: 1px solid #222;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: #e94560;
+        }
+
+        .search-box input::placeholder {
+            color: #555;
+        }
+
+        .playlist-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .playlist-items::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .playlist-items::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        .playlist-items::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+
+        .playlist-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            gap: 12px;
+        }
+
+        .playlist-item:hover {
+            background: #1a1a2e;
+        }
+
+        .playlist-item.active {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: 1px solid #e94560;
+        }
+
+        .playlist-item .index {
+            color: #555;
+            font-size: 0.85rem;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .playlist-item.active .index {
+            color: #e94560;
+        }
+
+        .playlist-item .info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .playlist-item .info .title {
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #ddd;
+        }
+
+        .playlist-item.active .info .title {
+            color: #fff;
+        }
+
+        .playlist-item .info .type {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .playlist-item .play-icon {
+            color: #555;
+            font-size: 1.2rem;
+        }
+
+        .playlist-item.active .play-icon {
+            color: #e94560;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: #555;
+        }
+
+        .status-bar {
+            padding: 10px 20px;
+            background: #0d0d0d;
+            border-top: 1px solid #222;
+            font-size: 0.8rem;
+            color: #555;
+            text-align: center;
+        }
+
+        .autoplay-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #333;
+            border-radius: 22px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            content: "";
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: #e94560;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(18px);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #333;
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: #555;
+            text-align: center;
+        }
+
+        .empty-state h3 {
+            margin-top: 15px;
+            color: #777;
+        }
+
+        .empty-state p {
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🎬 Stream Player</h1>
+        <p>Auto-updated playlist • Last build: <span id="lastUpdate"></span></p>
+    </div>
+
+    <div class="container">
+        <div class="player-section">
+            <div class="video-wrapper" id="videoWrapper">
+                <div class="video-placeholder" id="placeholder">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <p>Select a video from the playlist</p>
+                </div>
+            </div>
+
+            <div class="now-playing" id="nowPlaying" style="display:none;">
+                <h3>▶ Now Playing</h3>
+                <p id="nowPlayingTitle">-</p>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" onclick="playPrevious()">⏮ Previous</button>
+                <button class="btn btn-primary" onclick="playNext()">Next ⏭</button>
+                <button class="btn btn-secondary" onclick="shufflePlaylist()">🔀 Shuffle</button>
+                <a id="downloadLink" class="btn btn-secondary" href="playlist.m3u" download>
+                    📥 Download M3U
+                </a>
+                <div class="autoplay-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autoplayToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span>Autoplay</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="playlist-section">
+            <div class="playlist-header">
+                <h2>📋 Playlist</h2>
+                <span class="playlist-count" id="playlistCount">0</span>
+            </div>
+
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 Search videos..."
+                       oninput="filterPlaylist()">
+            </div>
+
+            <div class="playlist-items" id="playlistContainer">
+                <!-- Items populated by JS -->
+            </div>
+
+            <div class="status-bar">
+                Auto-refreshes every 6 hours via GitHub Actions
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Embedded playlist data (updated by scraper)
+        const PLAYLIST_DATA = [];
+
+        let currentIndex = -1;
+        let hlsInstance = null;
+        let filteredIndices = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('lastUpdate') .textContent = new Date().toLocaleString();
+            initPlaylist();
+            if (PLAYLIST_DATA.length > 0) {
+                playVideo(0);
+            }
+        });
+
+        function initPlaylist() {
+            const container = document.getElementById('playlistContainer');
+            const countEl = document.getElementById('playlistCount');
+            countEl.textContent = PLAYLIST_DATA.length;
+
+            if (PLAYLIST_DATA.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="#333">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                        </svg>
+                        <h3>No Videos Available</h3>
+                        <p>The playlist is empty. Wait for the next update.</p>
+                    </div>`;
+                return;
+            }
+
+            filteredIndices = PLAYLIST_DATA.map((_, i) => i);
+            renderPlaylist(filteredIndices);
+        }
+
+        function renderPlaylist(indices) {
+            const container = document.getElementById('playlistContainer');
+
+            if (indices.length === 0) {
+                container.innerHTML = '<div class="no-results">No matching videos found</div>';
+                return;
+            }
+
+            container.innerHTML = indices.map(i => {
+                const item = PLAYLIST_DATA[i];
+                const isActive = i === currentIndex;
+                const streamUrl = item.stream_url || '';
+                let type = 'Video';
+                if (streamUrl.includes('.m3u8')) type = 'HLS Stream';
+                else if (streamUrl.includes('.mp4')) type = 'MP4';
+                else if (streamUrl.includes('embed')) type = 'Embed';
+
+                return `
+                    <div class="playlist-item ${isActive ? 'active' : ''}"
+                         onclick="playVideo(${i})" title="${escapeHtml(item.title)}">
+                        <span class="index">${i + 1}</span>
+                        <div class="info">
+                            <div class="title">${escapeHtml(item.title)}</div>
+                            <div class="type">${type}</div>
+                        </div>
+                        <span class="play-icon">${isActive ? '🔊' : '▶'}</span>
+                    </div>`;
+            }).join('');
+        }
+
+        function playVideo(index) {
+            if (index < 0 || index >= PLAYLIST_DATA.length) return;
+
+            currentIndex = index;
+            const item = PLAYLIST_DATA[index];
+            const wrapper = document.getElementById('videoWrapper');
+            const placeholder = document.getElementById('placeholder');
+            const nowPlaying = document.getElementById('nowPlaying');
+            const nowPlayingTitle = document.getElementById('nowPlayingTitle');
+
+            // Destroy previous HLS instance
+            if (hlsInstance) {
+                hlsInstance.destroy();
+                hlsInstance = null;
+            }
+
+            // Remove existing video/iframe
+            const existingMedia = wrapper.querySelector('video, iframe');
+            if (existingMedia) existingMedia.remove();
+            if (placeholder) placeholder.style.display = 'none';
+
+            const streamUrl = item.stream_url;
+
+            if (streamUrl.includes('.m3u8')) {
+                // HLS Stream
+                const video = document.createElement('video');
+                video.controls = true;
+                video.autoplay = true;
+                video.id = 'videoPlayer';
+                wrapper.appendChild(video);
+
+                if (Hls.isSupported()) {
+                    hlsInstance = new Hls({
+                        xhrSetup: function(xhr) {
+                            xhr.setRequestHeader('Referer', item.page_url || '');
+                        }
+                    });
+                    hlsInstance.loadSource(streamUrl);
+                    hlsInstance.attachMedia(video);
+                    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play().catch(() => {});
+                    });
+                    hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            console.error('HLS Error:', data);
+                            if (document.getElementById('autoplayToggle').checked) {
+                                setTimeout(() => playNext(), 3000);
+                            }
+                        }
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = streamUrl;
+                    video.play().catch(() => {});
+                }
+
+                video.onended = () => {
+                    if (document.getElementById('autoplayToggle').checked) {
+                        playNext();
+                    }
+                };
+
+            } else if (streamUrl.includes('.mp4') || streamUrl.includes('.webm')) {
+                // Direct video file
+                const video = document.createElement('video');
+                video.controls = true;
+                video.autoplay = true;
+                video.id = 'videoPlayer';
+                video.src = streamUrl;
+                wrapper.appendChild(video);
+
+                video.play().catch(() => {});
+                video.onended = () => {
+                    if (document.getElementById('autoplayToggle').checked) {
+                        playNext();
+                    }
+                };
+                video.onerror = () => {
+                    if (document.getElementById('autoplayToggle').checked) {
+                        setTimeout(() => playNext(), 3000);
+                    }
+                };
+
+            } else {
+                // Embed / iframe
+                const iframe = document.createElement('iframe');
+                iframe.src = streamUrl;
+                iframe.allow = 'autoplay; encrypted-media; fullscreen';
+                iframe.allowFullscreen = true;
+                iframe.id = 'videoPlayer';
+                wrapper.appendChild(iframe);
+            }
+
+            // Update UI
+            nowPlaying.style.display = 'block';
+            nowPlayingTitle.textContent = item.title;
+            document.title = `▶ ${item.title} - Stream Player`;
+
+            // Update playlist highlighting
+            renderPlaylist(filteredIndices);
+
+            // Scroll active item into view
+            setTimeout(() => {
+                const activeItem = document.querySelector('.playlist-item.active');
+                if (activeItem) {
+                    activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+
+        function playNext() {
+            if (currentIndex < PLAYLIST_DATA.length - 1) {
+                playVideo(currentIndex + 1);
+            } else {
+                playVideo(0); // Loop back
+            }
+        }
+
+        function playPrevious() {
+            if (currentIndex > 0) {
+                playVideo(currentIndex - 1);
+            } else {
+                playVideo(PLAYLIST_DATA.length - 1);
+            }
+        }
+
+        function shufflePlaylist() {
+            if (PLAYLIST_DATA.length === 0) return;
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * PLAYLIST_DATA.length);
+            } while (randomIndex === currentIndex && PLAYLIST_DATA.length > 1);
+            playVideo(randomIndex);
+        }
+
+        function filterPlaylist() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            if (!query) {
+                filteredIndices = PLAYLIST_DATA.map((_, i) => i);
+            } else {
+                filteredIndices = PLAYLIST_DATA
+                    .map((item, i) => ({ index: i, title: item.title.toLowerCase() }))
+                    .filter(item => item.title.includes(query))
+                    .map(item => item.index);
+            }
+
+            document.getElementById('playlistCount').textContent = filteredIndices.length;
+            renderPlaylist(filteredIndices);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+
+            switch(e.key) {
+                case 'ArrowRight':
+                case 'n':
+                    e.preventDefault();
+                    playNext();
+                    break;
+                case 'ArrowLeft':
+                case 'p':
+                    e.preventDefault();
+                    playPrevious();
+                    break;
+                case 's':
+                    e.preventDefault();
+                    shufflePlaylist();
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    const video = document.getElementById('videoPlayer');
+                    if (video && video.tagName === 'VIDEO') {
+                        video.paused ? video.play() : video.pause();
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
