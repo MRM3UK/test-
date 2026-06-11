@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://kaamdesi.com"
-MAX_PAGES = 999  # No limit - scrape ALL pages until no more
+MAX_PAGES = 37  # No limit - scrape ALL pages until no more
 DELAY = 2
 
 
