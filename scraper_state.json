@@ -1,8 +1,8 @@
 {
-  "last_page": 96,
+  "last_page": 116,
   "completed": false,
-  "total_videos": 2879,
-  "last_run": "2026-06-11 18:33:30 UTC",
-  "run_count": 4,
-  "last_mode": "refresh"
+  "total_videos": 3479,
+  "last_run": "2026-06-11 19:24:50 UTC",
+  "run_count": 5,
+  "last_mode": "batch"
 }
