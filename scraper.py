@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 BASE_URL = "https://kaamdesi.com"
 DELAY = 2
-BATCH_PAGES = 33
+BATCH_PAGES = 20
 REFRESH_PAGES = 2
 MAX_PAGE_LIMIT = 300
 
