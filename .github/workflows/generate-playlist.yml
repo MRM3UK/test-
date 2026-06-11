@@ -2,14 +2,12 @@ name: Generate M3U Playlist
 
 on:
   schedule:
-    # Batch scrape: every 1.5 hours for building full playlist
     - cron: '0 */2 * * *'
-    # New content check: every 3 hours (offset by 30 min)
     - cron: '30 */3 * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Mode: batch (33 pages from last position) or refresh (first 2 pages)'
+        description: 'batch | refresh | reset'
         required: false
         default: 'batch'
         type: choice
@@ -17,6 +15,11 @@ on:
           - batch
           - refresh
           - reset
+      start_page:
+        description: 'Force start from this page (optional, batch only)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -43,42 +46,45 @@ jobs:
       - name: Determine mode
         id: mode
         run: |
-          # Manual trigger
           if [ "${{ github.event.inputs.mode }}" != "" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-            echo "Mode: ${{ github.event.inputs.mode }} (manual)"
-            exit 0
-          fi
-
-          # Scheduled trigger - check cron
-          MINUTE=$(date -u +%M)
-          HOUR=$(date -u +%H)
-
-          # If state file says we reached the end, do refresh only
-          if [ -f scraper_state.json ]; then
-            COMPLETED=$(python3 -c "import json;s=json.load(open('scraper_state.json'));print(s.get('completed',False))" 2>/dev/null || echo "False")
-            if [ "$COMPLETED" = "True" ]; then
+          elif [ -f scraper_state.json ]; then
+            COMPLETED=$(python3 -c "import json;print(json.load(open('scraper_state.json')).get('completed',False))" 2>/dev/null || echo "False")
+            MINUTE=$(date -u +%M)
+            if [ "$COMPLETED" = "True" ] || [ "$MINUTE" = "30" ]; then
               echo "mode=refresh" >> $GITHUB_OUTPUT
-              echo "Mode: refresh (all pages already scraped)"
-              exit 0
+            else
+              echo "mode=batch" >> $GITHUB_OUTPUT
             fi
-          fi
-
-          # Check if this is the refresh cron (30 min offset)
-          if [ "$MINUTE" = "30" ]; then
-            echo "mode=refresh" >> $GITHUB_OUTPUT
-            echo "Mode: refresh (scheduled)"
           else
             echo "mode=batch" >> $GITHUB_OUTPUT
-            echo "Mode: batch (scheduled)"
           fi
 
+      - name: Show current state
+        run: |
+          echo "=== CURRENT STATE ==="
+          if [ -f scraper_state.json ]; then
+            cat scraper_state.json
+          else
+            echo "No state file - first run"
+          fi
+          echo ""
+          if [ -f playlist.json ]; then
+            echo "Existing videos: $(python3 -c 'import json;print(len(json.load(open("playlist.json"))))' 2>/dev/null || echo 0)"
+          fi
+          echo "===================="
+
       - name: Run scraper
-        run: python scraper.py --mode ${{ steps.mode.outputs.mode }} 2>&1 | tee scraper.log
+        run: |
+          ARGS="--mode ${{ steps.mode.outputs.mode }}"
+          if [ "${{ github.event.inputs.start_page }}" != "" ]; then
+            ARGS="$ARGS --start-page ${{ github.event.inputs.start_page }}"
+          fi
+          python scraper.py $ARGS 2>&1 | tee scraper.log
         env:
           PYTHONUNBUFFERED: "1"
 
-      - name: Results summary
+      - name: Results
         if: always()
         run: |
           echo "========================================="
@@ -86,18 +92,13 @@ jobs:
             python3 -c "
           import json
           s = json.load(open('scraper_state.json'))
-          print(f\"Mode:           {s.get('last_mode','?')}\")
-          print(f\"Last page:      {s.get('last_page',0)}\")
-          print(f\"Completed:      {s.get('completed',False)}\")
-          print(f\"Total videos:   {s.get('total_videos',0)}\")
-          print(f\"Last run:       {s.get('last_run','?')}\")
-          print(f\"Runs count:     {s.get('run_count',0)}\")
+          print(f\"Mode:         {s.get('last_mode','?')}\")
+          print(f\"Last page:    {s.get('last_page',0)}\")
+          print(f\"Completed:    {s.get('completed',False)}\")
+          print(f\"Total videos: {s.get('total_videos',0)}\")
+          print(f\"Last run:     {s.get('last_run','?')}\")
+          print(f\"Run count:    {s.get('run_count',0)}\")
           "
-          fi
-          echo "========================================="
-          if [ -f playlist.m3u ]; then
-            echo "M3U lines: $(wc -l < playlist.m3u)"
-            echo "M3U size:  $(du -h playlist.m3u | cut -f1)"
           fi
           echo "========================================="
 
